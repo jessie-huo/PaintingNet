@@ -5,7 +5,7 @@ And change path variable to where your chrome driver is.
 """
 
 
-from os import nice
+from os import error, nice
 import time
 #from datetime import datetime
 import requests
@@ -21,8 +21,8 @@ driver = webdriver.Chrome(executable_path = r'/Users/jchuo/Downloads/chromedrive
 driver.get(philip)
 
 # scroll to page bottom
-driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
-time.sleep(5)
+#driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
+#time.sleep(5)
 
 # collect all urls of auctions
 auctions = []
@@ -31,6 +31,7 @@ while True:
     try:
         xpath = driver.find_element_by_xpath('//*[@id="main-list-backbone"]/li[{}]/div[2]/h2/a'.format(n))
     except:
+        #driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
         break
     html = xpath.get_attribute('outerHTML')
     ind = html.find('href="')
@@ -49,7 +50,7 @@ print('Total {} auctions'.format(len(auctions)))
 ID = 1
 for i in range(len(auctions)):
     print('collecting art works from the {}/{} url'.format(i+1, len(auctions)))
-    driver.get(url)
+    driver.get(auctions[i])
     
     n = 1
     while True:
@@ -57,7 +58,8 @@ for i in range(len(auctions)):
         # get image
         try:
             image_xpath = driver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/div/div/div[2]/ul/li[{}]/div/div[1]/a/div/img'.format(n))
-        except:
+        except error:
+            print('ERROR: ' + error)
             break
         image_html = image_xpath.get_attribute('outerHTML')
         ind = image_html.find('src="')
@@ -73,18 +75,20 @@ for i in range(len(auctions)):
             f.write(image.content)
             f.close()
 
-        # get artist name
-        artist_xpath = driver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/div/div/div[2]/ul/li[{}]/div/a/p[2]'.format(n))
-        artist_html = artist_xpath.get_attribute('outerHTML')
-        ind = artist_html.find('title="')
-        artist = ''
-        for b in artist_html[ind+7:]:
-            if b != '"':
-                artist += b
-            else:
+        # get price
+        try:
+            price = driver.find_element('/html/body/div[3]/div/div[2]/div/div/div/div[2]/ul/li[{}]/div/a/p[5]'.format(n))
+        except error:
+            print('ERROR: ' + error)
+            break
+        price_html = price.get_attribute('outerHTML')
+        for ind in range(-4, -100, -1):
+            if price_html[ind] == '>':
                 break
-        print('artist: ' + artist)
+        price = price_html[ind+1:-4]
+        print('price of {} is {}'.format(ID, price))
 
+        """
         # get title of art work
         title_xpath = driver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/div/div/div[2]/ul/li[{}]/div/a/p[3]'.format(n))
         title_html = title_xpath.get_attribute('outerHTML')
@@ -96,6 +100,18 @@ for i in range(len(auctions)):
             else:
                 break
         print('title: ' + title)
+
+        # get artist name
+        artist_xpath = driver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/div/div/div[2]/ul/li[{}]/div/a/p[2]'.format(n))
+        artist_html = artist_xpath.get_attribute('outerHTML')
+        ind = artist_html.find('title="')
+        artist = ''
+        for b in artist_html[ind+7:]:
+            if b != '"':
+                artist += b
+            else:
+                break
+        print('artist: ' + artist)
 
         # find pre-auction low estimate
         low_xpath = driver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/div/div/div[2]/ul/li[{}]/div/a/p[4]/span/span[1]'.format(n))
@@ -122,18 +138,7 @@ for i in range(len(auctions)):
             else:
                 break
         print('high estimate: ' + high)
-
-        # get price
-        try:
-            price = driver.find_element_by_xpath('/html/body/div[3]/div/div[2]/div/div/div/div[2]/ul/li[{}]/div/a/p[5]'.format(n))
-        except:
-            break
-        price_html = price.get_attribute('outerHTML')
-        for ind in range(-4, -100, -1):
-            if price_html[ind] == '>':
-                break
-        price = price_html[ind+1:-4]
-        print('price: ' + price)
+        """        
 
         n += 1
         ID += 1
