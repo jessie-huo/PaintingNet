@@ -1,3 +1,24 @@
+"""
+class1: log <= 2.5      -> 2371 張
+class2: 2.5< log <=3.0  -> 7274 張
+class3: 3.0< log <=3.5  -> 8073 張
+class4: log > 3.5       -> 4666 張
+
+File structure:
+root
+    |- train
+            |- class1
+            |- class2
+            |- class3
+            |- class4
+    |- val  
+            |- class1
+            |- class2
+            |- class3
+            |- class4
+"""
+
+
 from __future__ import print_function
 from __future__ import division
 import torch
@@ -11,17 +32,12 @@ import time
 import os
 import copy
 
-print("PyTorch Version: ",torch.__version__)
-print("Torchvision Version: ",torchvision.__version__)
 
-
-def train_model(model, dataloaders, criterion, optimizer, num_epochs=25): # criterion: the loss function
+def train_model(model, dataloaders, criterion, optimizer, num_epochs=25):
     start = time.time()
-
+    
     val_acc_history = []
-
-    # The learnable parameters (i.e. weights and biases) of a model are contained in model.parameters(). 
-    # model.state_dict() is a dictionary that maps each layer to its parameter tensor.
+    # model.state_dict(): a dictionary that maps each layer to its parameter tensor.
     best_model_weights = copy.deepcopy(model.state_dict())
     best_acc = 0.0
 
@@ -55,10 +71,10 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25): # crit
                     loss = criterion(outputs, labels)
                     _, preds = torch.max(outputs, dim=1) # torch.max() returns the maximum value and its index
 
-                    # backward + optimize only if in training phase
+                    # backward and update params only when training
                     if phase == 'train':
                         loss.backward()
-                        optimizer.step() # update parameter
+                        optimizer.step()
 
                 # statistics
                 # tensor.item(): Returns the value of this tensor as a standard Python number. 
@@ -88,71 +104,81 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs=25): # crit
     model.load_state_dict(best_model_weights)
     return model, val_acc_history
 
+
 def initialize_model(model_name, num_classes, feature_extract=False, use_pretrained=True):
     if model_name == "densenet":
-        # model_ft: fine tuned model
-        model_ft = models.densenet121(pretrained=use_pretrained)
-        num_ftrs = model_ft.classifier.in_features
-        # reshape the last layer to output a new number of classes
-        model_ft.classifier = nn.Linear(num_ftrs, num_classes)
+        model = models.densenet121(pretrained=use_pretrained)
+        # reshape the last layer to output a number of classes specified by us
+        num_ftrs = model.classifier.in_features
+        model.classifier = nn.Linear(num_ftrs, num_classes)
         input_size = 224
     else:
         print("Invalid model name, exiting...")
         exit()
-    return model_ft, input_size
+    return model, input_size
 
 
-data_dir = "./dataset/CS682_FinalProject_Dataset/images"
-model_name = "densenet"
-num_classes = 2
-batch_size = 8
-num_epochs = 15
-feature_extract = False # False: finetune the whole model; True: only change the last layer
+if __name__ == '__main__':
 
-# Initialize the model
-model, input_size = initialize_model(model_name, num_classes, feature_extract, use_pretrained=True)
-#print(model)
+    print("PyTorch Version: ",torch.__version__)
+    print("Torchvision Version: ",torchvision.__version__)
 
-# Data augmentation and normalization for training
-# Normalization for validation
-data_transforms = {
-    'train': transforms.Compose([
-        # Crop a random portion of image and resize it to input_size
-        transforms.RandomResizedCrop(input_size),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ]),
-    'val': transforms.Compose([
-        transforms.Resize(input_size),
-        transforms.CenterCrop(input_size),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ]),
-}
-# Create training and validation datasets
-image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x]) for x in ['train', 'val']}
-# Create training and validation dataloaders
-dataloaders_dict = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val']}
-# Detect if we have a GPU available
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    data_dir = "./dataset/root"
+    model_name = "densenet"
+    num_classes = 4
+    batch_size = 8
+    num_epochs = 15
+    feature_extract = False # False: finetune the whole model; True: only change the last layer
 
-# Send the model to GPU
-model = model.to(device)
+    model, input_size = initialize_model(model_name, num_classes, feature_extract, use_pretrained=True) # input_size hard-coded as 224
+    print('The pretrained densenet:')
+    print(model)
 
-# Gather the parameters to be optimized/updated in this run.
-# If we are finetuning we will be updating all parameters.
-params_to_update = model.parameters()
-print("Params to learn:")
-for name, param in params_to_update:
-    if param.requires_grad == True:
-        print("\t",name)
+    # Data augmentation and normalization for training
+    # Normalization for validation
+    data_transforms = {
+        'train': transforms.Compose([
+            # Crop a random portion of image and resize it to input_size
+            transforms.RandomResizedCrop(input_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ]),
+        'val': transforms.Compose([
+            transforms.Resize(input_size),
+            transforms.CenterCrop(input_size),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ]),
+    }
+    # Create training and validation datasets
+    image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x]) for x in ['train', 'val']}
+    # Create training and validation dataloaders
+    dataloaders_dict = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val']}
+    print('Created data loader ...')
 
-# Observe that all parameters are being optimized
-optimizer = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+    # Detect if we have a GPU available
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # Send the model to GPU
+    model = model.to(device)
 
-# Setup the loss function
-criterion = nn.CrossEntropyLoss()
+    # Gather the parameters to be optimized/updated in this run.
+    # If we are finetuning we will be updating all parameters.
+    params_to_update = model.parameters()
+    print('Parameters to learn:')
+    for name, param in model.named_parameters():
+        if param.requires_grad == True:
+            print(name)
 
-# Train and evaluate
-model_ft, hist = train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=num_epochs)
+    # Setup the optimizer and loss function (criterion)
+    optimizer = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
+    criterion = nn.CrossEntropyLoss()
+
+    # Train and evaluate
+    print('Start fine-tuning')
+    model_ft, hist = train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=num_epochs)
+    print('The fine-tuned densenet:')
+    print(model_ft)
+
+    # save the fine-tuned model
+    torch.save(model_ft.state_dict(), 'FinetunedDenseNet.pt')
