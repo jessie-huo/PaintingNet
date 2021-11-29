@@ -1,0 +1,5 @@
+# ignore mac temp files
+*.DS_Store
+
+# ignore VS code project setting file
+.vscode/*
